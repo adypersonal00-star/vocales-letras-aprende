@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build and emulator-test Android APK
 on:
   push:
     branches: [main]
@@ -6,8 +6,9 @@ on:
 permissions:
   contents: read
 jobs:
-  build:
+  build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Extract Android project
@@ -19,8 +20,25 @@ jobs:
       - name: Build debug APK
         working-directory: project
         run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug
-      - uses: actions/upload-artifact@v4
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and smoke-test on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
         with:
-          name: vocales-letras-aprende-v1-debug
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7_pro
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          working-directory: project
+          script: python3 scripts/emulator_smoke.py
+      - name: Upload tested debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocales-letras-aprende-emulator-tested
           path: project/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
