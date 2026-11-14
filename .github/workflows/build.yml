@@ -1,0 +1,29 @@
+name: Build Android APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract Android project
+        run: python3 -c "import zipfile; zipfile.ZipFile('vocales-letras-aprende-source.zip').extractall('project')"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Build debug APK
+        working-directory: project
+        run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vocales-letras-aprende-v1-debug
+          path: project/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
